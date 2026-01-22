@@ -22,31 +22,41 @@ class BatchDataClient:
     def _parse_address(self, address: str) -> dict[str, str]:
         """Parse SF DataSF address format into components.
 
-        DataSF format: "0000 0710 NORTH POINT         ST0000" (messy)
-        We need: street, city, state
+        DataSF format examples:
+        - "0000 0710 NORTH POINT         ST0000"
+        - "2710 2706 HYDE                ST0000"
+
+        We need: street, city, state (clean format like "710 NORTH POINT ST")
         """
-        # Clean up the address - remove extra spaces and trailing codes
-        addr = " ".join(address.split())  # normalize whitespace
+        import re
 
-        # Remove trailing zip-like codes (0000)
-        parts = addr.rsplit(" ", 1)
-        if parts and parts[-1].isdigit():
-            addr = parts[0]
+        # Normalize whitespace
+        addr = " ".join(address.split())
 
-        # Remove leading zeros/numbers that aren't part of street number
+        # Remove trailing "0000" or similar codes
+        addr = re.sub(r'\d{4}$', '', addr).strip()
+
+        # Split "ST" suffix that's attached to name (e.g., "POINTST" -> "POINT ST")
+        addr = re.sub(r'([A-Z]{2,})(ST|AVE|BLVD|DR|CT|PL|WAY|RD|LN|TER|CIR)$', r'\1 \2', addr)
+
+        # Parse: find first non-zero number as street number
         words = addr.split()
-        # Find first non-zero street number
-        street_parts = []
-        found_street_num = False
-        for word in words:
-            if not found_street_num and word.isdigit():
-                if int(word) > 0:
-                    street_parts.append(word)
-                    found_street_num = True
-            else:
-                street_parts.append(word)
+        street_num = None
+        street_name_parts = []
 
-        street = " ".join(street_parts) if street_parts else addr
+        for word in words:
+            if street_num is None and word.isdigit():
+                num = int(word)
+                if num > 0:
+                    street_num = str(num)  # Remove leading zeros
+            elif street_num is not None:
+                street_name_parts.append(word)
+            # Skip leading zeros
+
+        if street_num and street_name_parts:
+            street = f"{street_num} {' '.join(street_name_parts)}"
+        else:
+            street = addr  # Fallback
 
         return {
             "street": street,
@@ -127,14 +137,16 @@ class BatchDataClient:
             for i, batch in enumerate(batches):
                 print(f"  Processing batch {i + 1}/{len(batches)} ({len(batch)} properties)...")
 
-                # Build request for batch
+                # Build request for batch using propertyAddress object
                 requests_data = []
                 for prop in batch:
                     addr_parts = self._parse_address(prop.get("address", ""))
                     requests_data.append({
-                        "street": addr_parts["street"],
-                        "city": addr_parts["city"],
-                        "state": addr_parts["state"],
+                        "propertyAddress": {
+                            "street": addr_parts["street"],
+                            "city": addr_parts["city"],
+                            "state": addr_parts["state"],
+                        }
                     })
 
                 try:
