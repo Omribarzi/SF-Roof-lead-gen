@@ -80,11 +80,54 @@ class BatchDataClient:
             name_parts.append(name["last"].title())
         owner_name = " ".join(name_parts)
 
-        # Phones: [{number, type, ...}]
+        # Phones: filter by quality
+        # Priority: tested+reachable, recent data, high score, not DNC
         for phone in person.get("phoneNumbers", []):
             phone_num = phone.get("number", "")
-            if phone_num and phone_num not in phones:
-                phones.append(phone_num)
+            if not phone_num or phone_num in [p[0] for p in phones]:
+                continue
+
+            # Quality checks
+            tested = phone.get("tested", False)
+            reachable = phone.get("reachable", False)
+            score = phone.get("score", 0)
+            dnc = phone.get("dnc", False)
+            last_reported = phone.get("lastReportedDate", "")
+            phone_type = phone.get("type", "")
+
+            # Skip DNC numbers (illegal to cold call)
+            if dnc:
+                continue
+
+            # Calculate quality score
+            quality = 0
+            is_recent = last_reported and last_reported >= "2024"
+            is_verified = tested and reachable
+
+            if is_verified:
+                quality += 50
+            if is_recent:
+                quality += 40
+            if score and int(score) >= 95:
+                quality += 20
+            elif score and int(score) >= 90:
+                quality += 10
+            if phone_type == "Mobile":
+                quality += 10
+
+            # STRICT: Only include if verified OR recent data
+            if is_verified or is_recent or (score and int(score) == 100 and reachable):
+                phones.append((phone_num, quality, phone_type, is_verified, is_recent))
+
+        # Sort by quality, take best numbers
+        phones.sort(key=lambda x: x[1], reverse=True)
+
+        # Track verification status
+        has_verified_phone = any(p[3] for p in phones)  # tested+reachable
+        has_recent_phone = any(p[4] for p in phones)    # 2024+ data
+
+        # Extract just the numbers
+        phone_numbers = [p[0] for p in phones]
 
         # Emails: [{email}]
         for email in person.get("emails", []):
@@ -105,14 +148,25 @@ class BatchDataClient:
             ]
             mailing_address = ", ".join(p for p in mailing_parts if p)
 
+        # Determine data quality level
+        if has_verified_phone:
+            data_quality = "verified"
+        elif has_recent_phone:
+            data_quality = "recent"
+        elif phone_numbers:
+            data_quality = "unverified"
+        else:
+            data_quality = "no_phone"
+
         return {
             "owner_name": owner_name,
-            "phone_1": phones[0] if len(phones) > 0 else "",
-            "phone_2": phones[1] if len(phones) > 1 else "",
-            "phone_3": phones[2] if len(phones) > 2 else "",
+            "phone_1": phone_numbers[0] if len(phone_numbers) > 0 else "",
+            "phone_2": phone_numbers[1] if len(phone_numbers) > 1 else "",
+            "phone_3": phone_numbers[2] if len(phone_numbers) > 2 else "",
             "email_1": emails[0] if len(emails) > 0 else "",
             "email_2": emails[1] if len(emails) > 1 else "",
             "mailing_address": mailing_address,
+            "data_quality": data_quality,
         }
 
     async def skip_trace_batch(
@@ -208,6 +262,7 @@ class BatchDataClient:
             "email_1": "",
             "email_2": "",
             "mailing_address": "",
+            "data_quality": "no_data",
         }
 
     def _empty_enrichment(self, properties: list[dict[str, Any]]) -> list[dict[str, Any]]:

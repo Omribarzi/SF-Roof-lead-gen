@@ -29,6 +29,7 @@ def export_to_csv(records: list[dict[str, Any]], output_path: str) -> None:
         "email_1",
         "email_2",
         "mailing_address",
+        "data_quality",
         "property_type",
         "year_built",
         "last_roof_permit_date",
