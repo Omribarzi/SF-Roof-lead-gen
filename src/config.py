@@ -8,9 +8,9 @@ load_dotenv()
 DATASF_PERMITS_URL = "https://data.sfgov.org/resource/i98e-djp9.json"
 DATASF_TAX_ROLLS_URL = "https://data.sfgov.org/resource/wv5m-vpq2.json"
 
-# Skip Trace API
-SKIP_TRACE_API_KEY = os.getenv("SKIP_TRACE_API_KEY", "")
-SKIP_TRACE_API_URL = os.getenv("SKIP_TRACE_API_URL", "https://api.batchskiptracing.com/v1")
+# BatchData.io API for skip tracing
+SKIP_TRACE_API_KEY = os.getenv("BATCHDATA_API_KEY", "")
+SKIP_TRACE_API_URL = "https://api.batchdata.com/api/v1"
 
 # DataSF App Token (optional but recommended for higher rate limits)
 DATASF_APP_TOKEN = os.getenv("DATASF_APP_TOKEN", "")

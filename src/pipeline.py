@@ -108,13 +108,13 @@ async def run_pipeline(
         lead["last_roof_permit_date"] = None
         lead["days_since_last_permit"] = 9999  # No recent permit
 
-    # 6. Skip trace enrichment
+    # 6. Skip trace enrichment via BatchData
     if skip_enrichment:
         skip_tracer = MockSkipTraceClient()
     else:
         skip_tracer = SkipTraceClient()
 
-    enriched = await skip_tracer.enrich_batch(leads)
+    enriched = await skip_tracer.skip_trace_batch(leads)
 
     # 7. Export to CSV
     output_path = f"{output_dir}/leads_{date.today()}.csv"
