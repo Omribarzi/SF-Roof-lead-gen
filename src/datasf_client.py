@@ -70,7 +70,7 @@ class DataSFClient:
         print("Fetching residential properties from Tax Rolls...")
 
         params = {
-            "$where": "use_definition like '%family dwelling%'",
+            "$where": "use_definition = 'Single Family Residential' OR use_definition = 'Multi-Family Residential'",
             "$select": "block,lot,property_location,use_definition,year_property_built",
         }
 
@@ -101,10 +101,10 @@ class DataSFClient:
 
         cutoff_date = get_cutoff_date(years)
 
-        # Query for roofing-related permits
+        # Query for roofing-related permits (case-insensitive search + reroof field)
         params = {
-            "$where": f"(description like '%ROOF%' OR description like '%ROOFING%') AND filed_date > '{cutoff_date}'",
-            "$select": "block,lot,street_number,street_name,street_suffix,filed_date,description",
+            "$where": f"(upper(description) like '%ROOF%' OR reroof = 'Y') AND filed_date > '{cutoff_date}'",
+            "$select": "block,lot,street_number,street_name,street_suffix,filed_date,description,reroof",
         }
 
         records = await self._fetch_paginated(DATASF_PERMITS_URL, params, limit)
